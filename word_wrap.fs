@@ -25,41 +25,44 @@ module Wrapping =
     let append<'a> (sa:seq<'a>) (a: 'a) = 
         Seq.append sa (Seq.singleton a)
 
+
+    let rec reassemble (limit:int) (remainingWords:string list) (currentLine:string) (output:string seq): string seq = 
+
+        // If the current line is empty, we don't need to append a space - so we have `limit` characters remaining to fill
+        // Otherwise, we will be appending a space, so we have one less character.
+        let remainingChars = 
+            if currentLine = "" 
+                then limit 
+                else (limit - currentLine.Length - 1)
+                
+        // If no space remains - append the current line and continue
+        if remainingChars <= 0
+        then reassemble limit remainingWords "" (append output currentLine)
+        else match remainingWords with 
+
+                // No more words to process - append the current line to the output in progress and return that as the final output
+                | [] -> append output currentLine 
+        
+                // The next word will fit on this line in whole.  Append it (with a space if needed), and continue
+                | word :: tail when word.Length <= remainingChars -> 
+                    let newLine = if currentLine = "" then word else $"{currentLine} {word}"
+                    reassemble limit tail newLine output
+            
+                // The next word will not fit in the remaining space, but it will fit on the next line.
+                // Output the current line and continue.
+                | word :: tail when word.Length <= limit ->
+                    reassemble limit remainingWords "" (append output currentLine)
+
+                // The next word will not fit in the remaining space, and it won't fit on the next line.
+                //    * Split that word into two - one that will fit, and the rest, and continue.
+                | word :: tail when word.Length > limit ->
+                    let splitWord = [word.[0..(remainingChars - 1)]; word.[remainingChars..]]
+                    reassemble limit (List.append splitWord tail) currentLine output 
+
+
+
     /// Split a message into a lines of at most `charlimit` characters 
     let WordWrap (charlimit:int) (message:string) = 
-        let rec reassemble (limit:int) (remainingWords:string list) (currentLine:string) (output:string seq): string seq = 
-
-            // If the current line is empty, we don't need to append a space - so we have `limit` characters remaining to fill
-            // Otherwise, we will be appending a space, so we have one less character.
-            let remainingChars = 
-                if currentLine = "" 
-                    then limit 
-                    else (limit - currentLine.Length - 1)
-                    
-            // If no space remains - append the current line and continue
-            if remainingChars <= 0
-            then reassemble limit remainingWords "" (append output currentLine)
-            else match remainingWords with 
-
-                    // No more words to process - append the current line to the output in progress and return that as the final output
-                    | [] -> append output currentLine 
-            
-                    // The next word will fit on this line in whole.  Append it (with a space if needed), and continue
-                    | word :: tail when word.Length <= remainingChars -> 
-                        let newLine = if currentLine = "" then word else $"{currentLine} {word}"
-                        reassemble limit tail newLine output
-                
-                    // The next word will not fit in the remaining space, but it will fit on the next line.
-                    // Output the current line and continue.
-                    | word :: tail when word.Length <= limit ->
-                        reassemble limit remainingWords "" (append output currentLine)
-
-                    // The next word will not fit in the remaining space, and it won't fit on the next line.
-                    //    * Split that word into two - one that will fit, and the rest, and continue.
-                    | word :: tail when word.Length > limit ->
-                        let splitWord = [word.[0..(remainingChars - 1)]; word.[remainingChars..]]
-                        reassemble limit (List.append splitWord tail) currentLine output 
-
 
         // Split the input on any whitespace
         let tokens: string list = Regex.Split(message, @"\s") |> Array.toList 
